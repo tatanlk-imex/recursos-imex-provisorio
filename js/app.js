@@ -13,6 +13,7 @@
     if (/^https?:/.test(path)) return path;
     if (path.indexOf('u:') === 0) return CFG.baseMiniaturas + path.slice(2);
     if (path.indexOf('w:') === 0) return CFG.baseFotosCatalogo + path.slice(2);
+    if (path.indexOf('r:') === 0) return CFG.baseR2 + path.slice(2);
     if (path.indexOf('fichas/') === 0) return path;
     return CFG.baseArchivos + path;
   }
@@ -23,7 +24,7 @@
   }
   function miniatura(path, w, h, fit) { return wsrv(url(path), { w: w, h: h || '', fit: fit || 'cover', output: 'webp', q: 72, we: 1 }); }
   function mb(b) { if (!b) return ''; return b >= 1e6 ? (b / 1e6).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' KB'; }
-  function nombreArchivo(path) { return decodeURIComponent(path.replace(/^[uw]:/, '').split('/').pop()); }
+  function nombreArchivo(path) { return decodeURIComponent(path.replace(/^[uwr]:/, '').split('/').pop()); }
   function fmtN(n) { return n.toLocaleString('es-CL'); }
   function aviso(t, ms) {
     var a = $('#aviso'); a.textContent = t; a.hidden = false;
@@ -279,7 +280,7 @@
       '<label class="arch-chk"><input type="checkbox" data-sel="' + esc(a.path) + '"' + (sel ? ' checked' : '') + '> Elegir</label>' +
       '<div class="arch-img' + (vert ? ' vert' : '') + '" data-ver="' + esc(a.path) + '"><img loading="lazy" alt="' + esc(a.et) + '" src="' + esc(miniatura(a.path, 360, vert ? 560 : 360, 'inside')) + '"></div>' +
       '<div class="arch-pie"><span class="arch-n">' + esc(a.et) + '</span>' +
-      '<span class="arch-p' + (pesado ? ' pesado' : '') + '">Original: ' + mb(a.peso) + ' · <a href="' + esc(url(a.path)) + '" target="_blank" rel="noopener">ver original</a></span>' +
+      '<span class="arch-p' + (pesado ? ' pesado' : '') + '">' + (a.peso ? 'Archivo: ' + mb(a.peso) + ' · ' : '') + '<a href="' + esc(url(a.path)) + '" target="_blank" rel="noopener">ver en grande</a></span>' +
       '<div class="arch-b"><button class="btn peq" data-desc="' + esc(a.path) + '">Descargar</button></div></div></div>';
   }
   function tarjetaVideo(a, p) {
