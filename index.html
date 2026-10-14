@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Recursos Imex</title>
+<meta name="description" content="Fotos, videos y fichas de los productos de las marcas de Imex para redes sociales, web y catálogos. Descarga cada foto en la medida y el peso que necesites.">
+<link rel="preconnect" href="https://wsrv.nl">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/estilos.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23123a5a'/%3E%3Cpath d='M9 22V10h3v12zm5 0V10h3l3 7 3-7h0v12h-3v-6l-2 5h-2l-2-5v6z' fill='%2389c540'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="saltar" href="#principal">Ir al contenido</a>
+<header class="cab">
+  <div class="cab-in">
+    <a class="logo" href="#/" aria-label="Recursos Imex, inicio">
+      <span class="logo-m">IMEX</span><span class="logo-r">Recursos</span>
+    </a>
+    <form class="buscar" role="search" onsubmit="return false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Busca por producto, código o marca (ej.: G2, D230040, cuchillo)" autocomplete="off" aria-label="Buscar productos">
+    </form>
+    <a class="cab-contacto" id="contacto-cab" href="#">Contacto</a>
+  </div>
+</header>
+
+<main id="principal">
+  <section id="vista-inicio">
+    <div class="heroe">
+      <div class="heroe-in">
+        <h1>Material gráfico de nuestras marcas, listo para usar</h1>
+        <p>Fotos para publicaciones e historias, videos y fichas técnicas de cada producto. <strong>Descarga cada foto en la medida, el formato y el peso que necesites</strong>, una por una o varias juntas en un ZIP.</p>
+        <div class="cifras" id="cifras"></div>
+      </div>
+    </div>
+
+    <nav class="marcas" id="marcas" aria-label="Marcas"></nav>
+
+    <div id="destacados">
+      <section class="bloque" aria-labelledby="t-nov">
+        <div class="bloque-cab"><h2 id="t-nov">Lo nuevo</h2>
+          <div class="flechas"><button class="flecha" data-car="-1" aria-label="Anteriores">‹</button><button class="flecha" data-car="1" aria-label="Siguientes">›</button></div></div>
+        <div class="carril" id="carril"></div>
+      </section>
+      <section class="bloque ideas" aria-labelledby="t-ideas">
+        <div class="bloque-cab"><h2 id="t-ideas">Ideas para publicar esta semana</h2>
+          <select id="semana" aria-label="Elegir semana"></select></div>
+        <p class="ideas-por" id="ideas-por"></p>
+        <div class="ideas-g" id="ideas"></div>
+      </section>
+      <section class="bloque doble">
+        <div class="consejo" aria-live="polite"><span class="etq">Consejo para vender más en redes</span><div id="consejo"></div><div class="puntos" id="puntos"></div></div>
+        <div class="comentarios" id="comentarios"></div>
+      </section>
+    </div>
+
+    <div class="filtros">
+      <div class="cats" id="cats" aria-label="Categorías"></div>
+      <div class="filtros-der">
+        <label class="chk"><input type="checkbox" id="f-redes"> Con material para redes</label>
+        <label class="chk"><input type="checkbox" id="f-video"> Con video</label>
+        <label class="chk"><input type="checkbox" id="f-pdf"> Con ficha PDF</label>
+        <select id="orden" aria-label="Ordenar">
+          <option value="nuevo">Más recientes primero</option>
+          <option value="az">Nombre A-Z</option>
+        </select>
+      </div>
+    </div>
+    <p class="resultado" id="resultado" aria-live="polite"></p>
+    <div class="grilla" id="grilla"></div>
+    <div class="mas"><button id="ver-mas" class="btn sec" hidden>Ver más productos</button></div>
+  </section>
+
+  <section id="vista-producto" hidden></section>
+</main>
+
+<div class="barra-desc" id="barra-desc" hidden>
+  <div class="barra-in">
+    <span id="sel-n">0 fotos seleccionadas</span>
+    <button class="btn sec" id="sel-limpiar">Quitar selección</button>
+    <button class="btn" id="sel-zip">Descargar seleccionadas (ZIP)</button>
+  </div>
+  <div class="progreso" id="progreso" hidden><div id="progreso-b"></div><span id="progreso-t"></span></div>
+</div>
+
+<footer class="pie">
+  <div class="pie-in">
+    <div>
+      <strong>Imex Estado Ltda.</strong><br>
+      Santa Bernardita 12025, Centro Empresarial Puerta Sur, San Bernardo<br>
+      <a id="contacto-pie" href="#"></a>
+    </div>
+    <div class="pie-nota">Material para clientes y distribuidores de Imex. Las imágenes y videos son de uso exclusivo para promocionar los productos de nuestras marcas.</div>
+  </div>
+</footer>
+
+<div class="aviso" id="aviso" role="status" hidden></div>
+
+<script src="js/config.js"></script>
+<script src="data/catalogo.js"></script>
+<script src="data/ideas.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+<script src="js/app.js" defer></script>
+</body>
+</html>
