@@ -10,5 +10,7 @@ window.RECURSOS_CONFIG = {
   // Fotos aligeradas en Cloudflare R2 (cuenta de prueba de Jonathan, 14-10-2026). Videos y PDF siguen en imex.cl.
   baseR2: 'https://pub-b2103fb011594be89cfff5a632fbbf9e.r2.dev/',
   redimensionador: 'https://wsrv.nl/',
-  correoContacto: 'recursosgraficos@imex.cl'
+  correoContacto: 'recursosgraficos@imex.cl',
+  // Correo de Marketing que recibe el aviso de códigos sin fotos (descarga por lista). Confirmar el correo correcto.
+  correoMarketing: 'recursosgraficos@imex.cl'
 };

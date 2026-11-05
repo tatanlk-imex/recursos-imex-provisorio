@@ -355,7 +355,8 @@
       aviso('Se abrió la foto en otra pestaña: guárdala con clic derecho › Guardar imagen.', 6000);
     }).then(function () { btn.disabled = false; btn.textContent = t; });
   }
-  function descargarZip(items) {
+  function descargarZip(items, op) {
+    op = op || {};
     if (!items.length) return;
     if (!window.JSZip) { aviso('Cargando… intenta de nuevo en un segundo.'); return; }
     var zip = new JSZip(), hechos = 0, fallas = 0, total = items.length, i = 0, usados = {};
@@ -366,16 +367,17 @@
       if (i >= total) return Promise.resolve();
       var it = items[i++];
       var carpeta = it.prod.t.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 60);
-      var n = carpeta + '/' + nombreSalida(it.path);
+      var n = it.nombre || (carpeta + '/' + nombreSalida(it.path));
       if (usados[n]) n = n.replace(/(\.\w+)$/, '_' + (++usados[n]) + '$1'); else usados[n] = 1;
       return traer(urlDescarga(it.path)).then(function (b) { zip.file(n, b); }).catch(function () { fallas++; })
         .then(function () { hechos++; bar.style.width = (hechos / total * 100) + '%'; txt.textContent = hechos + ' de ' + total + ' fotos'; return sig(); });
     }
     Promise.all([sig(), sig(), sig(), sig()]).then(function () {
       txt.textContent = 'Armando el ZIP…';
+      Object.keys(op.extras || {}).forEach(function (k) { zip.file(k, op.extras[k]); });
       return zip.generateAsync({ type: 'blob' });
     }).then(function (b) {
-      var f = new Date(), nom = 'Recursos_Imex_' + f.getFullYear() + String(f.getMonth() + 1).padStart(2, '0') + String(f.getDate()).padStart(2, '0') + '.zip';
+      var f = new Date(), nom = (op.prefijo || 'Recursos_Imex_') + f.getFullYear() + String(f.getMonth() + 1).padStart(2, '0') + String(f.getDate()).padStart(2, '0') + '.zip';
       guardarBlob(b, nom);
       aviso('ZIP listo: ' + (total - fallas) + ' fotos, ' + mb(b.size) + (fallas ? '. ' + fallas + ' no se pudieron bajar.' : '.'), 6000);
     }).catch(function () { aviso('No se pudo armar el ZIP. Intenta con menos fotos.', 6000); })
@@ -398,10 +400,170 @@
     return DATA.productos.filter(function (p) { return p.id === id; })[0];
   }
 
+  // ---------- descarga por lista de códigos AX ----------
+  var CODIDX = {};
+  function ncod(s) { return String(s).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  DATA.productos.forEach(function (p) {
+    if (!p.cod) return;
+    var k = ncod(p.cod), q = CODIDX[k];
+    if (!q || (!q.fp && p.fp) || (p.nF > q.nF && !!p.fp === !!q.fp)) CODIDX[k] = p;
+  });
+  var lista = { codigos: [], res: null };
+  if (!opc.lnum) opc.lnum = '3';
+  if (!opc.ltipo) opc.ltipo = 'producto';
+
+  // Si vienen varias columnas (Excel, CSV o copia de una planilla), se usa la columna con más códigos conocidos.
+  function columnaDeCodigos(filas) {
+    var hits = [], maxc = 0;
+    filas.forEach(function (f) { maxc = Math.max(maxc, f.length); f.forEach(function (v, i) { if (CODIDX[ncod(v)]) hits[i] = (hits[i] || 0) + 1; }); });
+    if (maxc <= 1) return filas.map(function (f) { return f[0] || ''; });
+    var best = 0; for (var i = 1; i < maxc; i++) if ((hits[i] || 0) > (hits[best] || 0)) best = i;
+    return filas.map(function (f) { return f[best] || ''; });
+  }
+  function leerCodigos(txt, filas) {
+    var vistos = {}, out = [];
+    if (!filas) {
+      var lineas = String(txt).split(/\r?\n/);
+      filas = lineas.map(function (l) { return l.split(/\t|;|\|/); });
+      if (!filas.some(function (f) { return f.length > 1; })) filas = lineas.map(function (l) { return l.split(','); });
+    }
+    columnaDeCodigos(filas).forEach(function (x) {
+      x = String(x);
+      x = x.trim().replace(/^["']|["']$/g, '').trim();
+      if (!x || !/\d/.test(x) || x.length > 30) return;
+      x.split(/\s+/).forEach(function (y) {
+        if (!/\d/.test(y) || y.length < 3) return;
+        var k = ncod(y); if (!k || vistos[k]) return; vistos[k] = 1; out.push(y.toUpperCase());
+      });
+    });
+    return out;
+  }
+  function fotosDe(p) {
+    if (!p) return [];
+    var prod = p.arch.filter(function (a) { return a.tipo === 'producto'; });
+    var redes = p.arch.filter(function (a) { return a.tipo === 'post' || a.tipo === 'banner' || a.tipo === 'historia'; });
+    if (opc.ltipo === 'producto') return prod;
+    if (opc.ltipo === 'redes') return redes;
+    return prod.concat(redes);
+  }
+  function revisarLista() {
+    var n = opc.lnum === 'todas' ? Infinity : +opc.lnum;
+    lista.res = lista.codigos.map(function (c) {
+      var p = CODIDX[ncod(c)], f = fotosDe(p);
+      var estado = !p ? 'no' : !f.length ? 'sin' : (n !== Infinity && f.length < n) ? 'parcial' : 'ok';
+      return { cod: c, p: p, disp: f.length, baja: f.slice(0, n), estado: estado };
+    });
+    return lista.res;
+  }
+  var TXT_TIPO = { producto: 'fotos de producto (fondo blanco)', ambas: 'fotos de producto y de redes', redes: 'fotos para redes' };
+  function faltantesTexto(conTitulo) {
+    var r = lista.res || [], t = [];
+    var no = r.filter(function (x) { return x.estado === 'no'; }), sin = r.filter(function (x) { return x.estado === 'sin'; }), par = r.filter(function (x) { return x.estado === 'parcial'; });
+    if (no.length) t.push((conTitulo ? 'Códigos que no están en el sitio (' + no.length + '):\n' : '') + no.map(function (x) { return '- ' + x.cod; }).join('\n'));
+    if (sin.length) t.push('Códigos sin ' + TXT_TIPO[opc.ltipo] + ' (' + sin.length + '):\n' + sin.map(function (x) { return '- ' + x.cod + ' · ' + x.p.t; }).join('\n'));
+    if (par.length) t.push('Códigos con menos fotos de las pedidas (' + par.length + ', se pidieron ' + opc.lnum + '):\n' + par.map(function (x) { return '- ' + x.cod + ' · ' + x.p.t + ' (tiene ' + x.disp + ')'; }).join('\n'));
+    return t.join('\n\n');
+  }
+  function faltantesCsv() {
+    var filas = [['codigo', 'producto', 'situacion', 'fotos_disponibles', 'fotos_pedidas']];
+    (lista.res || []).forEach(function (x) {
+      if (x.estado === 'ok') return;
+      filas.push([x.cod, x.p ? x.p.t : '', x.estado === 'no' ? 'No está en el sitio' : x.estado === 'sin' ? 'Sin fotos' : 'Menos fotos de las pedidas', x.disp, opc.lnum]);
+    });
+    return '﻿' + filas.map(function (f) { return f.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
+  }
+  function pintarLista() {
+    function seg(nombre, items) {
+      return '<div class="seg" data-op="' + nombre + '">' + items.map(function (i) {
+        return '<button type="button" data-v="' + i[0] + '" aria-pressed="' + (opc[nombre] === i[0]) + '">' + i[1] + (i[2] ? '<small>' + i[2] + '</small>' : '') + '</button>';
+      }).join('') + '</div>';
+    }
+    document.title = 'Descarga por lista de códigos · Recursos Imex';
+    $('#vista-lista').innerHTML = '<nav class="migas"><a href="#/">Inicio</a> › Descarga por lista de códigos</nav>' +
+      '<h1 class="lista-h1">Descarga fotos por lista de códigos</h1>' +
+      '<p class="lista-ayuda">Pega los códigos AX (uno por línea o copiando una columna desde Excel) o sube un archivo Excel, CSV o TXT. Te armamos un ZIP con una carpeta por código y te avisamos qué códigos no tienen fotos.</p>' +
+      '<div class="lista-grid"><div class="lista-caja"><label class="t" for="l-codigos">Códigos AX</label>' +
+      '<textarea id="l-codigos" rows="9" placeholder="BL-G2-7&#10;D230063&#10;A606060">' + esc(lista.codigos.join('\n')) + '</textarea>' +
+      '<div class="lista-arch"><label class="btn sec peq" for="l-archivo">Subir Excel, CSV o TXT</label><input type="file" id="l-archivo" accept=".xlsx,.xls,.csv,.txt" hidden><span id="l-arch-n"></span></div></div>' +
+      '<div class="lista-caja"><div class="op"><label class="t">Fotos por código</label>' + seg('lnum', [['1', '1 foto', 'la principal'], ['2', '2 fotos', ''], ['3', '3 fotos', ''], ['todas', 'Todas', 'las que haya']]) + '</div>' +
+      '<div class="op" style="margin-top:14px"><label class="t">Qué fotos</label>' + seg('ltipo', [['producto', 'De producto', 'fondo blanco'], ['ambas', 'Producto + redes', 'primero fondo blanco'], ['redes', 'Solo redes', 'posts e historias']]) + '</div></div></div>' +
+      panelOpciones() +
+      '<div class="lista-acc"><button class="btn" id="l-revisar">Revisar códigos</button><button class="btn" id="l-zip" disabled>Descargar ZIP</button></div>' +
+      '<div id="l-res"></div>';
+    refrescarOpciones();
+    if (lista.res) pintarResultado();
+  }
+  function pintarResultado() {
+    var r = revisarLista();
+    var c = { ok: 0, parcial: 0, sin: 0, no: 0 }, total = 0;
+    r.forEach(function (x) { c[x.estado]++; total += x.baja.length; });
+    var falt = c.no + c.sin + c.parcial;
+    var h = '<div class="lista-resumen"><b>' + r.length + ' códigos</b> · <span class="ok">' + c.ok + ' completos</span>' +
+      (c.parcial ? ' · <span class="parc">' + c.parcial + ' con menos fotos</span>' : '') +
+      (c.sin ? ' · <span class="mal">' + c.sin + ' sin fotos</span>' : '') + (c.no ? ' · <span class="mal">' + c.no + ' no encontrados</span>' : '') +
+      ' · <b>' + total + ' fotos</b> para descargar' + (total > 400 ? ' (puede tardar varios minutos)' : '') + '</div>';
+    if (falt) {
+      h += '<div class="alerta-falt"><b>⚠ Faltan fotos en ' + falt + (falt === 1 ? ' código' : ' códigos') + '.</b> Avísale a Marketing para que las carguen.' +
+        '<div class="lista-acc"><button class="btn" id="l-aviso">Avisar a Marketing</button><button class="btn sec" id="l-csv">Descargar lista de faltantes (Excel)</button></div></div>';
+    }
+    h += '<div class="tabla-envoltura"><table class="tabla-lista"><thead><tr><th>Código</th><th>Producto</th><th>Disponibles</th><th>Se descargan</th><th>Estado</th></tr></thead><tbody>' +
+      r.map(function (x) {
+        var est = { ok: ['ok', 'Completo'], parcial: ['parc', 'Tiene ' + x.disp + ' de ' + opc.lnum], sin: ['mal', 'Sin fotos'], no: ['mal', 'No está en el sitio'] }[x.estado];
+        return '<tr><td>' + esc(x.cod) + '</td><td>' + (x.p ? '<a href="#/p/' + encodeURIComponent(x.p.id) + '">' + esc(x.p.t) + '</a>' : '—') + '</td><td>' + x.disp + '</td><td>' + x.baja.length + '</td><td><span class="' + est[0] + '">' + est[1] + '</span></td></tr>';
+      }).join('') + '</tbody></table></div>';
+    $('#l-res').innerHTML = h;
+    $('#l-zip').disabled = !total;
+  }
+  function avisarMarketing() {
+    var cuerpo = 'Hola:\n\nAl descargar fotos por lista de códigos en el sitio de recursos (' + location.href.split('#')[0] + '), estos códigos no tienen las fotos pedidas (' + TXT_TIPO[opc.ltipo] + '):\n\n' + faltantesTexto(true) + '\n\nPor favor cárguenlas o avísenme si hay otra foto que pueda usar.\n\nSaludos.';
+    if (cuerpo.length > 1800) {
+      guardarBlob(new Blob([faltantesCsv()], { type: 'text/csv' }), 'Codigos_sin_fotos.csv');
+      cuerpo = cuerpo.slice(0, 1500).replace(/\n[^\n]*$/, '') + '\n\n(La lista sigue: adjunto el archivo Codigos_sin_fotos.csv que se acaba de descargar.)\n\nSaludos.';
+      aviso('La lista es larga: se descargó Codigos_sin_fotos.csv para adjuntarlo al correo.', 7000);
+    }
+    var n = (lista.res || []).filter(function (x) { return x.estado !== 'ok'; }).length;
+    location.href = 'mailto:' + CFG.correoMarketing + '?subject=' + encodeURIComponent('Faltan fotos en el sitio de recursos (' + n + ' códigos)') + '&body=' + encodeURIComponent(cuerpo);
+  }
+  function zipLista() {
+    var items = [], usados = {};
+    lista.res.forEach(function (x) {
+      if (!x.baja.length) return;
+      var carpeta = (x.cod + ' - ' + x.p.t).replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 70);
+      x.baja.forEach(function (a, i) {
+        var nom = carpeta + '/' + x.cod.replace(/[^\w\-]+/g, '_') + '_' + String(i + 1).padStart(2, '0') + sufijo() + '.' + opc.formato;
+        if (usados[nom]) return; usados[nom] = 1;
+        items.push({ path: a.path, prod: x.p, nombre: nom });
+      });
+    });
+    var extras = {}, ft = faltantesTexto(true);
+    if (ft) extras['CODIGOS_SIN_FOTOS.txt'] = 'Revisión del ' + new Date().toLocaleString('es-CL') + '\n\n' + ft + '\n';
+    descargarZip(items, { prefijo: 'Fotos_por_codigo_', extras: extras });
+  }
+  function cargarArchivo(f) {
+    $('#l-arch-n').textContent = 'Leyendo ' + f.name + '…';
+    var listo = function (txt, filas) { var cs = leerCodigos(txt, filas);$('#l-codigos').value = cs.join('\n'); $('#l-arch-n').textContent = f.name + ': ' + cs.length + ' códigos'; };
+    if (/\.xlsx?$/i.test(f.name)) {
+      var leer = function () {
+        f.arrayBuffer().then(function (buf) {
+          var wb = XLSX.read(buf, { type: 'array' });
+          var filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
+          listo('', filas.map(function (r) { return r.map(String); }));
+        }).catch(function () { $('#l-arch-n').textContent = 'No se pudo leer el Excel. Copia la columna de códigos y pégala.'; });
+      };
+      if (window.XLSX) leer();
+      else { var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = leer; s.onerror = function () { $('#l-arch-n').textContent = 'No se pudo cargar el lector de Excel. Copia la columna y pégala.'; }; document.head.appendChild(s); }
+    } else { f.text().then(listo); }
+  }
+
   // ---------- rutas ----------
   function ruta() {
     var h = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
-    var vi = $('#vista-inicio'), vp = $('#vista-producto');
+    var vi = $('#vista-inicio'), vp = $('#vista-producto'), vl = $('#vista-lista');
+    if (h === 'lista') {
+      if (!vi.hidden) est.scroll = window.scrollY;
+      vi.hidden = true; vp.hidden = true; vl.hidden = false; pintarLista(); window.scrollTo(0, 0); return;
+    }
+    vl.hidden = true;
     if (h.indexOf('p/') === 0) {
       var p = DATA.productos.filter(function (x) { return x.id === h.slice(2); })[0];
       if (p) {
@@ -432,8 +594,21 @@
     if (t.matches('.cat')) { est.cat = t.getAttribute('data-c'); est.mostrados = POR_PAGINA; pintarMarcas(); pintarGrilla(); return; }
     if (t.id === 'ver-mas') { est.mostrados += POR_PAGINA; pintarGrilla(); return; }
     if (t.closest('.seg')) {
-      var k = t.closest('.seg').getAttribute('data-op'); opc[k] = t.getAttribute('data-v'); guardarOpciones(); refrescarOpciones(); return;
+      var k = t.closest('.seg').getAttribute('data-op'); opc[k] = t.getAttribute('data-v'); guardarOpciones(); refrescarOpciones();
+      if (!$('#vista-lista').hidden) {
+        $('#vista-lista').querySelectorAll('.seg').forEach(function (s) { var kk = s.getAttribute('data-op'); s.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-v') === opc[kk])); }); });
+        if (lista.res) pintarResultado();
+      }
+      return;
     }
+    if (t.id === 'l-revisar') {
+      lista.codigos = leerCodigos($('#l-codigos').value);
+      if (!lista.codigos.length) { aviso('No encontré códigos. Pega uno por línea, por ejemplo D230063.'); return; }
+      $('#l-codigos').value = lista.codigos.join('\n'); pintarResultado(); return;
+    }
+    if (t.id === 'l-zip') { if (opc.medida === 'perso' && !parseInt(opc.ancho, 10) && !parseInt(opc.alto, 10)) { aviso('Escribe el ancho o el alto que necesitas.'); return; } zipLista(); return; }
+    if (t.id === 'l-aviso') { avisarMarketing(); return; }
+    if (t.id === 'l-csv') { guardarBlob(new Blob([faltantesCsv()], { type: 'text/csv' }), 'Codigos_sin_fotos.csv'); return; }
     if (t.hasAttribute('data-desc')) { descargarUna(t.getAttribute('data-desc'), t); return; }
     if (t.hasAttribute('data-selgrupo')) {
       var g = t.getAttribute('data-selgrupo'), p = productoActual();
@@ -473,6 +648,7 @@
   document.addEventListener('change', function (e) {
     var t = e.target;
     if (t.hasAttribute('data-sel')) alternarSel(t.getAttribute('data-sel'), t.checked);
+    if (t.id === 'l-archivo' && t.files[0]) { cargarArchivo(t.files[0]); t.value = ''; }
     if (t.id === 'f-video') { est.video = t.checked; est.mostrados = POR_PAGINA; pintarGrilla(); }
     if (t.id === 'f-redes') { est.redes = t.checked; est.mostrados = POR_PAGINA; pintarGrilla(); }
     if (t.id === 'semana') pintarIdeas(+t.value);
@@ -481,6 +657,7 @@
   });
   document.addEventListener('input', function (e) {
     var t = e.target;
+    if (t.id === 'l-codigos') { var z = $('#l-zip'); if (z) z.disabled = true; }
     if (t.id === 'op-ancho' || t.id === 'op-alto') { opc[t.id === 'op-ancho' ? 'ancho' : 'alto'] = t.value; guardarOpciones(); refrescarOpciones(); }
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { var v = $('.visor'); if (v) v.remove(); } });
@@ -489,7 +666,7 @@
     clearTimeout(tq);
     tq = setTimeout(function () {
       est.q = e.target.value.trim(); est.mostrados = POR_PAGINA;
-      if (!$('#vista-producto').hidden) { location.hash = est.marca ? '#/m/' + est.marca : '#/'; return; }
+      if (!$('#vista-producto').hidden || !$('#vista-lista').hidden) { location.hash = est.marca ? '#/m/' + est.marca : '#/'; return; }
       pintarGrilla();
     }, 180);
   });
