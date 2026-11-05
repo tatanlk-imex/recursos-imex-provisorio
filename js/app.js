@@ -366,8 +366,8 @@
     function sig() {
       if (i >= total) return Promise.resolve();
       var it = items[i++];
-      var carpeta = it.prod.t.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 60);
-      var n = it.nombre || (carpeta + '/' + nombreSalida(it.path));
+      // Todas las fotos van juntas en la raíz del ZIP (sin una carpeta por producto)
+      var n = it.nombre || nombreSalida(it.path);
       if (usados[n]) n = n.replace(/(\.\w+)$/, '_' + (++usados[n]) + '$1'); else usados[n] = 1;
       return traer(urlDescarga(it.path)).then(function (b) { zip.file(n, b); }).catch(function () { fallas++; })
         .then(function () { hechos++; bar.style.width = (hechos / total * 100) + '%'; txt.textContent = hechos + ' de ' + total + ' fotos'; return sig(); });
@@ -481,7 +481,7 @@
     document.title = 'Descarga por lista de códigos · Recursos Imex';
     $('#vista-lista').innerHTML = '<nav class="migas"><a href="#/">Inicio</a> › Descarga por lista de códigos</nav>' +
       '<h1 class="lista-h1">Descarga fotos por lista de códigos</h1>' +
-      '<p class="lista-ayuda">Pega los códigos AX (uno por línea o copiando una columna desde Excel) o sube un archivo Excel, CSV o TXT. Te armamos un ZIP con una carpeta por código y te avisamos qué códigos no tienen fotos.</p>' +
+      '<p class="lista-ayuda">Pega los códigos AX (uno por línea o copiando una columna desde Excel) o sube un archivo Excel, CSV o TXT. Te armamos un ZIP con todas las fotos juntas, nombradas por código (D230063_01, D230063_02…), y te avisamos qué códigos no tienen fotos.</p>' +
       '<div class="lista-grid"><div class="lista-caja"><label class="t" for="l-codigos">Códigos AX</label>' +
       '<textarea id="l-codigos" rows="9" placeholder="BL-G2-7&#10;D230063&#10;A606060">' + esc(lista.codigos.join('\n')) + '</textarea>' +
       '<div class="lista-arch"><label class="btn sec peq" for="l-archivo">Subir Excel, CSV o TXT</label><input type="file" id="l-archivo" accept=".xlsx,.xls,.csv,.txt" hidden><span id="l-arch-n"></span></div></div>' +
@@ -528,9 +528,8 @@
     var items = [], usados = {};
     lista.res.forEach(function (x) {
       if (!x.baja.length) return;
-      var carpeta = (x.cod + ' - ' + x.p.t).replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 70);
       x.baja.forEach(function (a, i) {
-        var nom = carpeta + '/' + x.cod.replace(/[^\w\-]+/g, '_') + '_' + String(i + 1).padStart(2, '0') + sufijo() + '.' + opc.formato;
+        var nom = x.cod.replace(/[^\w\-]+/g, '_') + '_' + String(i + 1).padStart(2, '0') + sufijo() + '.' + opc.formato;
         if (usados[nom]) return; usados[nom] = 1;
         items.push({ path: a.path, prod: x.p, nombre: nom });
       });
