@@ -194,6 +194,7 @@
   // ---------- producto ----------
   var MEDIDAS = [
     ['orig', 'Tamaño original', 'sin cambiar medidas'],
+    ['c1000', 'Cuadrada web / catálogo', '1000 × 1000'],
     ['post', 'Post cuadrado', '1080 × 1080'],
     ['vert', 'Post vertical', '1080 × 1350'],
     ['hist', 'Historia / Reel', '1080 × 1920'],
@@ -202,7 +203,7 @@
     ['w400', 'Miniatura', '400 px de ancho'],
     ['perso', 'A medida', 'tú eliges']
   ];
-  var FIJAS = { post: [1080, 1080], vert: [1080, 1350], hist: [1080, 1920] };
+  var FIJAS = { c1000: [1000, 1000], post: [1080, 1080], vert: [1080, 1350], hist: [1080, 1920] };
   var CALIDAD = { alta: [90, 'Alta'], media: [80, 'Media'], liviana: [62, 'Liviana'] };
 
   function paramsDescarga() {
